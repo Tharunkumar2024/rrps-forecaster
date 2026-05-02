@@ -66,7 +66,7 @@ app = FastAPI(
 )
 
 # 2. Add metrics instrumentation
-Instrumentator().instrument(app).expose(app)
+Instrumentator().instrument(app).expose(app, tags=["System"])
 
 # 3. Request tracking middleware
 @app.middleware("http")
