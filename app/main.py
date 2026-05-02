@@ -52,7 +52,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(router, prefix="/api/v1", tags=["Recommendations"])
+app.include_router(router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["System"])
