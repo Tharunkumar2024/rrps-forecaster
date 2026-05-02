@@ -28,7 +28,7 @@ python -m app.scripts.generate_data
 
 ### 4. Start the API Server
 ```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+python main.py
 ```
 
 ### 5. Open Swagger UI
