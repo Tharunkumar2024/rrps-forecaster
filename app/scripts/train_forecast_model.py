@@ -37,25 +37,66 @@ OPERATING_HOURS = set(range(6, 24))
 # 1. Data loading
 # ---------------------------------------------------------------------------
 
-def load_order_data() -> pd.DataFrame:
-    """Load raw order data from the database and return a DataFrame."""
+def load_data() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Load raw order data and feedback data from the database."""
     engine = create_engine(settings.database_url_sync, echo=False)
 
-    query = text("""
+    query_orders = text("""
         SELECT timestamp, covers
         FROM orders
         ORDER BY timestamp
     """)
+    query_feedback = text("""
+        SELECT feedback_date, actual
+        FROM feedback
+    """)
 
     with engine.connect() as conn:
-        df = pd.read_sql(query, conn)
+        orders_df = pd.read_sql(query_orders, conn)
+        feedback_df = pd.read_sql(query_feedback, conn)
 
-    if df.empty:
+    if orders_df.empty:
         logger.error("No order data found in database. Run generate_data first.")
         sys.exit(1)
 
-    logger.info("Loaded %d raw order records", len(df))
-    return df
+    logger.info("Loaded %d raw order records and %d feedback records", len(orders_df), len(feedback_df))
+    return orders_df, feedback_df
+
+
+def apply_feedback_scaling(orders_df: pd.DataFrame, feedback_df: pd.DataFrame) -> pd.DataFrame:
+    """Scale hourly covers in orders_df based on actuals from feedback_df."""
+    if feedback_df.empty:
+        return orders_df
+
+    orders_df = orders_df.copy()
+    orders_df["date"] = pd.to_datetime(orders_df["timestamp"]).dt.date
+    feedback_df["date"] = pd.to_datetime(feedback_df["feedback_date"]).dt.date
+
+    # Group orders by date to get the original daily total
+    daily_totals = orders_df.groupby("date")["covers"].sum().reset_index()
+    daily_totals.rename(columns={"covers": "original_daily_covers"}, inplace=True)
+
+    # Merge feedback and calculate scaling factor
+    merged = pd.merge(daily_totals, feedback_df, on="date", how="left")
+    merged["scaling_factor"] = 1.0
+    
+    # Where we have feedback, calculate scaling factor: actual / original (avoid division by zero)
+    mask = merged["actual"].notna() & (merged["original_daily_covers"] > 0)
+    merged.loc[mask, "scaling_factor"] = merged.loc[mask, "actual"] / merged.loc[mask, "original_daily_covers"]
+    
+    # Handle case where original is 0 but actual is > 0 (can't simply scale, would need to distribute)
+    # For simplicity, we just won't scale if original was exactly 0.
+
+    # Merge scaling factor back to orders
+    orders_df = pd.merge(orders_df, merged[["date", "scaling_factor"]], on="date", how="left")
+    
+    # Apply scaling
+    orders_df["covers"] = orders_df["covers"] * orders_df["scaling_factor"]
+    
+    # Clean up
+    orders_df.drop(columns=["date", "scaling_factor"], inplace=True)
+    
+    return orders_df
 
 
 # ---------------------------------------------------------------------------
@@ -222,7 +263,10 @@ def run() -> None:
     logger.info("=" * 60)
 
     # Load
-    raw_df = load_order_data()
+    orders_df, feedback_df = load_data()
+    
+    # Apply feedback corrections
+    raw_df = apply_feedback_scaling(orders_df, feedback_df)
 
     # Feature engineering
     feature_df = build_features(raw_df)

@@ -1,36 +1,36 @@
 // Configuration
 const CONFIG = {
-    // Set your FastAPI backend URL here
     API_BASE_URL: 'http://localhost:8000/api/v1'
 };
+
+// Global Chart instance to destroy on re-render
+let forecastChartInstance = null;
+let currentInventoryData = null; // Store for recalculation
 
 // Tab switching logic
 document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
-        // Remove active class from all buttons
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-        // Add to clicked
         e.currentTarget.classList.add('active');
         
-        // Hide all views
         document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
-        
-        // Show target view
         const targetId = e.currentTarget.getAttribute('data-target');
         document.getElementById(targetId).classList.add('active');
         
-        // Reset scroll position
+        // Auto-refresh metrics if that tab is clicked
+        if (targetId === 'view-metrics') {
+            fetchModelMetrics();
+        }
+        
         document.querySelector('.content-area').scrollTop = 0;
     });
 });
 
-// Utility function for setting today's date
 function setTodayDate(elementId) {
     const today = new Date().toISOString().split('T')[0];
     document.getElementById(elementId).value = today;
 }
 
-// Utility function for setting tomorrow's date
 function setTomorrowDate(elementId) {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -38,15 +38,31 @@ function setTomorrowDate(elementId) {
     document.getElementById(elementId).value = dateStr;
 }
 
-// Initialize on load
+function setDateConstraints() {
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Planning & Forecasting is for upcoming days only
+    document.getElementById('forecast-date').setAttribute('min', today);
+    document.getElementById('staff-date').setAttribute('min', today);
+    document.getElementById('inventory-date').setAttribute('min', today);
+    
+    // Feedback is only for actuals (today or past dates)
+    document.getElementById('fb-date').setAttribute('max', today);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     setTodayDate('forecast-date');
     setTodayDate('fb-date');
     setTomorrowDate('staff-date');
     setTomorrowDate('inventory-date');
+    
+    // Apply validation constraints
+    setDateConstraints();
+    
+    // Auto-fetch prediction for today's feedback
+    fetchPredictionForFeedback();
 });
 
-// Helper for UI loading states
 function setLoadingState(section, isLoading) {
     const btn = document.getElementById(`btn-${section}`);
     const loader = document.getElementById(`loader-${section}`);
@@ -97,10 +113,7 @@ document.getElementById('btn-forecast').addEventListener('click', async () => {
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         
         const data = await response.json();
-        const tbody = document.getElementById('forecast-table-body');
-        tbody.innerHTML = '';
-        
-        let forecastList = Array.isArray(data) ? data : data.hourly_forecast || data.forecast || Object.entries(data).map(([k, v]) => ({ hour: k, covers: v }));
+        let forecastList = Array.isArray(data) ? data : data.hourly_forecast || [];
 
         if (forecastList.length === 0) {
             showError('forecast', 'No forecast data available for this date.');
@@ -108,25 +121,31 @@ document.getElementById('btn-forecast').addEventListener('click', async () => {
         }
 
         let totalCovers = 0;
+        let peakHour = '';
+        let maxCovers = -1;
+        
+        const labels = [];
+        const chartData = [];
+
         forecastList.forEach(item => {
-            const tr = document.createElement('tr');
-            const tdHour = document.createElement('td');
-            tdHour.textContent = item.hour ?? item.time ?? item.timestamp ?? '';
-            const tdCovers = document.createElement('td');
+            const covers = parseInt(item.predicted_covers, 10) || 0;
+            const hour = item.hour;
             
-            const covers = parseInt(item.predicted_covers ?? item.covers ?? item.value ?? 0, 10) || 0;
             totalCovers += covers;
+            labels.push(`${hour}:00`);
+            chartData.push(covers);
             
-            tdCovers.textContent = covers;
-            tr.appendChild(tdHour);
-            tr.appendChild(tdCovers);
-            tbody.appendChild(tr);
+            if (covers > maxCovers) {
+                maxCovers = covers;
+                peakHour = `${hour}:00`;
+            }
         });
         
-        const totalCoversEl = document.getElementById('total-covers');
-        if (totalCoversEl) totalCoversEl.textContent = totalCovers;
+        document.getElementById('total-covers').textContent = totalCovers;
+        document.getElementById('peak-hour').textContent = peakHour;
         
-        document.getElementById('result-forecast').style.display = 'flex';
+        renderForecastChart(labels, chartData);
+        document.getElementById('result-forecast').style.display = 'block';
 
     } catch (error) {
         showError('forecast', 'Failed to fetch forecast: ' + error.message);
@@ -134,6 +153,71 @@ document.getElementById('btn-forecast').addEventListener('click', async () => {
         setLoadingState('forecast', false);
     }
 });
+
+function renderForecastChart(labels, data) {
+    const ctx = document.getElementById('forecastChart').getContext('2d');
+    
+    if (forecastChartInstance) {
+        forecastChartInstance.destroy();
+    }
+    
+    const gradient = ctx.createLinearGradient(0, 0, 0, 350);
+    gradient.addColorStop(0, 'rgba(139, 92, 246, 0.5)'); // Primary color
+    gradient.addColorStop(1, 'rgba(139, 92, 246, 0.0)');
+
+    forecastChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Predicted Covers',
+                data: data,
+                borderColor: '#8b5cf6',
+                backgroundColor: gradient,
+                borderWidth: 3,
+                pointBackgroundColor: '#fff',
+                pointBorderColor: '#8b5cf6',
+                pointBorderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                    titleColor: '#94a3b8',
+                    bodyColor: '#fff',
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    padding: 10
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false },
+                    ticks: { color: '#94a3b8' }
+                },
+                y: {
+                    grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false },
+                    ticks: { color: '#94a3b8', beginAtZero: true }
+                }
+            },
+            interaction: {
+                mode: 'nearest',
+                axis: 'x',
+                intersect: false
+            }
+        }
+    });
+}
 
 // 2. Staff Plan Section
 document.getElementById('btn-staff').addEventListener('click', async () => {
@@ -147,43 +231,7 @@ document.getElementById('btn-staff').addEventListener('click', async () => {
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         
         const data = await response.json();
-        const tbody = document.getElementById('staff-table-body');
-        tbody.innerHTML = '';
-
-        let peakWaiters = 0;
-        let peakChefs = 0;
-
-        if (data.hourly_plan && Array.isArray(data.hourly_plan)) {
-            data.hourly_plan.forEach(hp => {
-                let w = 0, c = 0;
-                if (hp.roles) {
-                    hp.roles.forEach(r => {
-                        if (r.role.toLowerCase() === 'waiter') w += r.count;
-                        if (r.role.toLowerCase() === 'chef') c += r.count;
-                    });
-                }
-                
-                peakWaiters = Math.max(peakWaiters, w);
-                peakChefs = Math.max(peakChefs, c);
-
-                const tr = document.createElement('tr');
-                const tdHour = document.createElement('td');
-                tdHour.textContent = hp.hour ?? '';
-                const tdWaiters = document.createElement('td');
-                tdWaiters.textContent = w;
-                const tdChefs = document.createElement('td');
-                tdChefs.textContent = c;
-                tr.appendChild(tdHour);
-                tr.appendChild(tdWaiters);
-                tr.appendChild(tdChefs);
-                tbody.appendChild(tr);
-            });
-        } else {
-            showError('staff', 'Unrecognized response format for staff plan.');
-        }
-        
-        document.getElementById('waiters-count').textContent = peakWaiters;
-        document.getElementById('chefs-count').textContent = peakChefs;
+        renderStaffTable(data.hourly_plan || []);
         document.getElementById('result-staff').style.display = 'block';
         
     } catch (error) {
@@ -193,52 +241,122 @@ document.getElementById('btn-staff').addEventListener('click', async () => {
     }
 });
 
+function renderStaffTable(hourlyPlan) {
+    const thead = document.getElementById('staff-table-head');
+    const tbody = document.getElementById('staff-table-body');
+    thead.innerHTML = '';
+    tbody.innerHTML = '';
+    
+    if (hourlyPlan.length === 0) return;
+
+    // Extract all unique roles across all hours
+    const roleSet = new Set();
+    hourlyPlan.forEach(hp => {
+        if(hp.roles) {
+            hp.roles.forEach(r => roleSet.add(r.role));
+        }
+    });
+    const roles = Array.from(roleSet).sort();
+    
+    // Find max count for each role for heatmap calculation
+    const maxCounts = {};
+    roles.forEach(role => maxCounts[role] = 0);
+    
+    hourlyPlan.forEach(hp => {
+        if(hp.roles) {
+            hp.roles.forEach(r => {
+                if(r.count > maxCounts[r.role]) maxCounts[r.role] = r.count;
+            });
+        }
+    });
+
+    // Create Header Row
+    const trHead = document.createElement('tr');
+    const thHour = document.createElement('th');
+    thHour.textContent = 'Hour';
+    trHead.appendChild(thHour);
+    
+    roles.forEach(role => {
+        const th = document.createElement('th');
+        th.textContent = role;
+        trHead.appendChild(th);
+    });
+    thead.appendChild(trHead);
+
+    // Create Body Rows
+    hourlyPlan.forEach(hp => {
+        const tr = document.createElement('tr');
+        
+        const tdHour = document.createElement('td');
+        tdHour.textContent = hp.hour ? `${hp.hour}:00` : '';
+        tr.appendChild(tdHour);
+        
+        // Map roles for this hour
+        const hourRolesMap = {};
+        if (hp.roles) {
+            hp.roles.forEach(r => hourRolesMap[r.role] = r.count);
+        }
+        
+        roles.forEach(role => {
+            const td = document.createElement('td');
+            const count = hourRolesMap[role] || 0;
+            td.textContent = count;
+            
+            // Apply Heatmap logic
+            const max = maxCounts[role] || 1; // prevent div zero
+            const intensity = count / max; // 0 to 1
+            
+            if (count > 0) {
+                td.className = 'heatmap-cell';
+                // Interpolate color: dark slate to primary purple
+                // Slate: 15, 23, 42
+                // Purple: 139, 92, 246
+                // For simplicity, just apply an rgba background
+                td.style.backgroundColor = `rgba(139, 92, 246, ${intensity * 0.8})`;
+            } else {
+                td.style.color = '#475569'; // dim 0s
+            }
+            
+            tr.appendChild(td);
+        });
+        
+        tbody.appendChild(tr);
+    });
+}
+
 // 3. Inventory Section
-document.getElementById('btn-inventory').addEventListener('click', async () => {
+document.getElementById('btn-inventory').addEventListener('click', () => fetchInventoryPlan({}));
+document.getElementById('btn-recalculate-inventory').addEventListener('click', () => {
+    // Gather current stock from inputs
+    const currentStock = {};
+    document.querySelectorAll('.stock-input').forEach(input => {
+        const name = input.getAttribute('data-name');
+        const val = parseFloat(input.value);
+        if (!isNaN(val) && val > 0) {
+            currentStock[name] = val;
+        }
+    });
+    fetchInventoryPlan(currentStock);
+});
+
+async function fetchInventoryPlan(currentStock = {}) {
     const dateStr = document.getElementById('inventory-date').value;
     if (!dateStr) return showError('inventory', 'Please select a date.');
 
     setLoadingState('inventory', true);
     
     try {
-        const response = await fetch(`${CONFIG.API_BASE_URL}/inventory-plan?target_date=${dateStr}`);
+        const payload = { target_date: dateStr, current_stock: currentStock };
+        const response = await fetch(`${CONFIG.API_BASE_URL}/inventory-plan`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         
         const data = await response.json();
-        const listEl = document.getElementById('inventory-list');
-        listEl.innerHTML = '';
-        
-        let ingredients = Array.isArray(data) ? data : data.inventory || data.ingredients || data.items || [];
-
-        if (ingredients.length === 0) {
-            showError('inventory', 'No inventory data available.');
-            return;
-        }
-
-        ingredients.forEach(item => {
-            const li = document.createElement('li');
-            li.className = 'inventory-item';
-            
-            const nameSpan = document.createElement('span');
-            nameSpan.className = 'inventory-name';
-            nameSpan.textContent = item.ingredient_name ?? item.name ?? item.ingredient ?? item.item ?? 'Unknown';
-            
-            const qtySpan = document.createElement('span');
-            qtySpan.className = 'inventory-qty';
-            let qty = item.quantity_kg ?? item.quantity ?? item.amount ?? item.value ?? '';
-            qtySpan.textContent = qty;
-            
-            if (item.unit) {
-                qtySpan.textContent += ` ${item.unit}`;
-            } else if (item.quantity_kg !== undefined) {
-                qtySpan.textContent += ` kg`;
-            }
-
-            li.appendChild(nameSpan);
-            li.appendChild(qtySpan);
-            listEl.appendChild(li);
-        });
-
+        currentInventoryData = data.ingredients || [];
+        renderInventoryCards(currentInventoryData, currentStock);
         document.getElementById('result-inventory').style.display = 'block';
 
     } catch (error) {
@@ -246,15 +364,94 @@ document.getElementById('btn-inventory').addEventListener('click', async () => {
     } finally {
         setLoadingState('inventory', false);
     }
-});
+}
+
+function renderInventoryCards(ingredients, currentStock) {
+    const listEl = document.getElementById('inventory-list');
+    listEl.innerHTML = '';
+
+    if (ingredients.length === 0) {
+        listEl.innerHTML = '<p class="text-muted">No procurement needed for this date.</p>';
+        return;
+    }
+
+    ingredients.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'inventory-card';
+        
+        const isPerishable = item.shelf_life_days < 3;
+        const shelfLifeClass = isPerishable ? 'badge warning' : 'badge';
+        
+        const stockValue = currentStock[item.ingredient_name] || 0;
+
+        card.innerHTML = `
+            <div class="inventory-header">
+                <span class="inventory-name">${item.ingredient_name}</span>
+                <div style="text-align: right;">
+                    <span style="font-size: 0.8rem; color: var(--text-muted); display: block; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.2rem;">To Order</span>
+                    <span class="inventory-qty">${item.quantity_kg.toFixed(2)} kg</span>
+                </div>
+            </div>
+            <div class="inventory-meta">
+                <span class="${shelfLifeClass}">Shelf Life: ${item.shelf_life_days}d</span>
+                <span class="badge">Lead Time: ${item.lead_time_days}d</span>
+            </div>
+            <div class="inventory-input-group mt-2">
+                <label>Current Stock (kg)</label>
+                <input type="number" class="dark-input stock-input" data-name="${item.ingredient_name}" value="${stockValue}" min="0" step="0.1" placeholder="0.0">
+            </div>
+        `;
+        listEl.appendChild(card);
+    });
+}
 
 // 4. Feedback Form
+
+// Auto-fetch prediction when date changes
+document.getElementById('fb-date').addEventListener('change', fetchPredictionForFeedback);
+
+async function fetchPredictionForFeedback() {
+    const dateStr = document.getElementById('fb-date').value;
+    if (!dateStr) return;
+
+    const predInput = document.getElementById('fb-predicted');
+    const submitBtn = document.getElementById('btn-feedback');
+    const loader = document.getElementById('fb-pred-loader');
+    
+    predInput.value = '';
+    predInput.placeholder = 'Loading...';
+    submitBtn.disabled = true;
+    loader.style.display = 'inline-block';
+    hideError('feedback');
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE_URL}/forecast?target_date=${dateStr}`);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        
+        const data = await response.json();
+        let forecastList = Array.isArray(data) ? data : data.hourly_forecast || [];
+        
+        let totalCovers = 0;
+        forecastList.forEach(item => {
+            totalCovers += (parseInt(item.predicted_covers, 10) || 0);
+        });
+        
+        predInput.value = totalCovers;
+        submitBtn.disabled = false;
+    } catch (error) {
+        predInput.placeholder = 'Error';
+        showError('feedback', 'Could not load prediction for this date. Generate forecast first.');
+    } finally {
+        loader.style.display = 'none';
+    }
+}
+
 document.getElementById('feedback-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     setLoadingState('feedback', true);
     
     const payload = {
-        date: document.getElementById('fb-date').value,
+        target_date: document.getElementById('fb-date').value,
         predicted_covers: parseInt(document.getElementById('fb-predicted').value, 10),
         actual_covers: parseInt(document.getElementById('fb-actual').value, 10),
         reason: document.getElementById('fb-reason').value,
@@ -273,6 +470,7 @@ document.getElementById('feedback-form').addEventListener('submit', async (e) =>
         showSuccess('feedback');
         document.getElementById('feedback-form').reset();
         setTodayDate('fb-date');
+        fetchPredictionForFeedback();
         
     } catch (error) {
         showError('feedback', 'Failed to submit feedback: ' + error.message);
@@ -280,3 +478,49 @@ document.getElementById('feedback-form').addEventListener('submit', async (e) =>
         setLoadingState('feedback', false);
     }
 });
+
+// 5. Metrics View
+document.getElementById('btn-metrics').addEventListener('click', fetchModelMetrics);
+
+async function fetchModelMetrics() {
+    setLoadingState('metrics', true);
+    
+    try {
+        const response = await fetch(`${CONFIG.API_BASE_URL}/model-info`);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        
+        const data = await response.json();
+        
+        const engineEl = document.getElementById('metric-engine');
+        const mapeEl = document.getElementById('metric-mape');
+        const featEl = document.getElementById('metric-features');
+        
+        if (data.is_model_loaded) {
+            engineEl.textContent = 'XGBoost AI Model';
+            engineEl.style.color = 'var(--success)';
+            
+            const mapePercent = (data.model_mape * 100).toFixed(2);
+            mapeEl.textContent = `${mapePercent}%`;
+            
+            if (data.model_mape > 0.2) {
+                mapeEl.style.color = 'var(--warning)'; // warn if WMAPE > 20%
+            } else {
+                mapeEl.style.color = 'var(--success)';
+            }
+            
+            featEl.textContent = data.feature_count || '--';
+        } else {
+            engineEl.textContent = 'Rule-Based Fallback';
+            engineEl.style.color = 'var(--warning)';
+            mapeEl.textContent = 'N/A';
+            mapeEl.style.color = 'var(--text-muted)';
+            featEl.textContent = '0 (Heuristics)';
+        }
+        
+    } catch (error) {
+        console.error("Failed to fetch model metrics", error);
+        document.getElementById('metric-engine').textContent = 'Error Fetching API';
+    } finally {
+        setLoadingState('metrics', false);
+    }
+}

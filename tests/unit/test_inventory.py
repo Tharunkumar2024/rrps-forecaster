@@ -75,6 +75,6 @@ def test_api_inventory_default_date(client: TestClient):
         from app.schemas.inventory_plan import InventoryPlanResponse
         mock_gen.return_value = InventoryPlanResponse(plan_date=date(2026,1,1), ingredients=[])
         
-        response = client.get("/api/v1/inventory-plan")
+        response = client.post("/api/v1/inventory-plan", json={})
         
     assert response.status_code == 200

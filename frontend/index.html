@@ -4,52 +4,72 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Restaurant Optimization Dashboard</title>
+    <!-- Modern Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <div class="app-background"></div>
     <div class="app-container">
-        <header>
-            <h1>Restaurant Optimization Dashboard</h1>
+        <header class="glass-panel">
+            <div class="logo">
+                <span class="logo-icon">✨</span>
+                <h1>Restaurant Forecaster <span>AI</span></h1>
+            </div>
         </header>
 
         <div class="main-layout">
             <!-- Navigation Sidebar -->
-            <aside class="sidebar-nav">
-                <button class="nav-btn active" data-target="view-forecast">📊 Daily Forecast</button>
-                <button class="nav-btn" data-target="view-staff">👥 Staff Plan</button>
-                <button class="nav-btn" data-target="view-inventory">📦 Inventory Plan</button>
-                <button class="nav-btn" data-target="view-feedback">💬 Daily Feedback</button>
+            <aside class="sidebar-nav glass-panel">
+                <button class="nav-btn active" data-target="view-forecast">
+                    <span class="icon">📊</span> Daily Forecast
+                </button>
+                <button class="nav-btn" data-target="view-staff">
+                    <span class="icon">👥</span> Staff Plan
+                </button>
+                <button class="nav-btn" data-target="view-inventory">
+                    <span class="icon">📦</span> Inventory Plan
+                </button>
+                <button class="nav-btn" data-target="view-feedback">
+                    <span class="icon">💬</span> Submit Feedback
+                </button>
+                <button class="nav-btn" data-target="view-metrics">
+                    <span class="icon">📈</span> AI Model Metrics
+                </button>
             </aside>
 
             <!-- Main Content Area -->
-            <main class="content-area">
+            <main class="content-area glass-panel">
                 
                 <!-- 1. Forecast View -->
                 <div id="view-forecast" class="view-section active">
                     <div class="action-bar">
-                        <h2>Daily Forecast</h2>
+                        <h2>Demand Forecast</h2>
                         <div class="controls">
-                            <input type="date" id="forecast-date">
+                            <input type="date" id="forecast-date" class="dark-input">
                             <button id="btn-forecast" class="primary-btn">
-                                <span class="loader" id="loader-forecast"></span> Get Forecast
+                                <span class="loader" id="loader-forecast"></span> Predict
                             </button>
                         </div>
                     </div>
                     <div id="error-forecast" class="error-msg"></div>
+                    
                     <div class="result-area" id="result-forecast" style="display: none;">
-                        <div class="insight-banner">
-                            <p><strong>Insight:</strong> Expecting a total of <strong id="total-covers" style="font-size: 1.1rem;">0</strong> customers (covers) throughout the day.</p>
+                        <div class="stats-grid">
+                            <div class="stat-card glass-card">
+                                <div class="stat-label">Total Expected Covers</div>
+                                <div class="stat-value text-neon" id="total-covers">0</div>
+                            </div>
+                            <div class="stat-card glass-card">
+                                <div class="stat-label">Peak Hour</div>
+                                <div class="stat-value text-neon" id="peak-hour">--</div>
+                            </div>
                         </div>
-                        <div class="table-container">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Hour</th>
-                                        <th>Predicted Covers</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="forecast-table-body"></tbody>
-                            </table>
+                        
+                        <div class="chart-container glass-card mt-4">
+                            <canvas id="forecastChart"></canvas>
                         </div>
                     </div>
                 </div>
@@ -57,29 +77,29 @@
                 <!-- 2. Staff Plan View -->
                 <div id="view-staff" class="view-section">
                     <div class="action-bar">
-                        <h2>Staff Plan</h2>
+                        <h2>Staffing Optimization</h2>
                         <div class="controls">
-                            <input type="date" id="staff-date">
+                            <input type="date" id="staff-date" class="dark-input">
                             <button id="btn-staff" class="primary-btn">
-                                <span class="loader" id="loader-staff"></span> Get Staff Plan
+                                <span class="loader" id="loader-staff"></span> Optimize Staff
                             </button>
                         </div>
                     </div>
                     <div id="error-staff" class="error-msg"></div>
+                    
                     <div class="result-area" id="result-staff" style="display: none;">
                         <div class="insight-banner">
-                            <p><strong>Insight:</strong> You need a maximum of <strong id="waiters-count">0</strong> Waiters and <strong id="chefs-count">0</strong> Chefs on shift simultaneously during your <strong>peak rush hour</strong>. See the hour-by-hour breakdown below to build your schedule.</p>
+                            <span class="insight-icon">💡</span>
+                            <p>Cells are heat-mapped. Darker colors indicate peak staffing requirements for that role.</p>
                         </div>
-                        <div class="table-container">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Hour (24h)</th>
-                                        <th>Waiters Needed</th>
-                                        <th>Chefs Needed</th>
-                                    </tr>
+                        <div class="table-container glass-card mt-4">
+                            <table id="staff-table">
+                                <thead id="staff-table-head">
+                                    <!-- Dynamic headers injected via JS -->
                                 </thead>
-                                <tbody id="staff-table-body"></tbody>
+                                <tbody id="staff-table-body">
+                                    <!-- Dynamic rows injected via JS -->
+                                </tbody>
                             </table>
                         </div>
                     </div>
@@ -88,21 +108,30 @@
                 <!-- 3. Inventory View -->
                 <div id="view-inventory" class="view-section">
                     <div class="action-bar">
-                        <h2>Inventory Plan</h2>
+                        <h2>Net Procurement Plan</h2>
                         <div class="controls">
-                            <input type="date" id="inventory-date">
+                            <input type="date" id="inventory-date" class="dark-input">
                             <button id="btn-inventory" class="primary-btn">
-                                <span class="loader" id="loader-inventory"></span> Get Inventory Plan
+                                <span class="loader" id="loader-inventory"></span> Calculate Needs
                             </button>
                         </div>
                     </div>
                     <div id="error-inventory" class="error-msg"></div>
+                    
                     <div class="result-area" id="result-inventory" style="display: none;">
                         <div class="insight-banner">
-                            <p><strong>Insight:</strong> These are the total bulk ingredients you need to prepare for the <strong>entire day</strong>. All quantities listed already include an automatic 15% safety stock buffer to handle unexpected demand.</p>
+                            <span class="insight-icon">💡</span>
+                            <p>Enter your <strong>Current Stock</strong> to calculate the actual Net Order required. Items with short shelf life (< 3 days) are highlighted in <span style="color:#f43f5e;font-weight:600;">red</span>.</p>
                         </div>
-                        <div class="table-container">
-                            <ul class="inventory-list" id="inventory-list"></ul>
+                        
+                        <div class="inventory-grid mt-4" id="inventory-list">
+                            <!-- Cards injected via JS -->
+                        </div>
+                        
+                        <div class="inventory-actions mt-4" style="text-align: right;">
+                            <button id="btn-recalculate-inventory" class="secondary-btn">
+                                Recalculate Net Order
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -110,30 +139,34 @@
                 <!-- 4. Feedback View -->
                 <div id="view-feedback" class="view-section">
                     <div class="action-bar">
-                        <h2>Daily Feedback</h2>
+                        <h2>Manager Feedback Loop</h2>
                     </div>
-                    <div id="success-feedback" class="success-msg">Feedback submitted successfully!</div>
+                    <div class="insight-banner mb-4">
+                        <span class="insight-icon">🧠</span>
+                        <p>Submitting actuals trains the AI model overnight to correct its future predictions.</p>
+                    </div>
+                    <div id="success-feedback" class="success-msg">Feedback submitted! The AI will learn from this discrepancy.</div>
                     <div id="error-feedback" class="error-msg"></div>
                     
-                    <form id="feedback-form" style="max-width: 600px;">
+                    <form id="feedback-form" class="glass-card form-container">
                         <div class="form-group">
                             <label for="fb-date">Date</label>
-                            <input type="date" id="fb-date" required>
+                            <input type="date" id="fb-date" class="dark-input" required>
                         </div>
                         <div class="grid-2">
-                            <div class="form-group">
-                                <label>Predicted Covers</label>
-                                <input type="number" id="fb-predicted" required min="0">
+                            <div class="form-group" style="position: relative;">
+                                <label>Predicted Covers <span id="fb-pred-loader" class="loader" style="width: 12px; height: 12px; border-width: 2px; border-top-color: var(--primary); display: none; position: absolute; right: 0; top: 0;"></span></label>
+                                <input type="number" id="fb-predicted" class="dark-input" required readonly placeholder="Loading...">
                             </div>
                             <div class="form-group">
-                                <label>Actual Covers</label>
-                                <input type="number" id="fb-actual" required min="0">
+                                <label>Actual Covers <span class="text-neon">*</span></label>
+                                <input type="number" id="fb-actual" class="dark-input" required min="0" placeholder="e.g. 145">
                             </div>
                         </div>
                         <div class="form-group">
                             <label>Reason for Discrepancy</label>
-                            <select id="fb-reason" required>
-                                <option value="normal">Normal</option>
+                            <select id="fb-reason" class="dark-input" required>
+                                <option value="normal">Normal / Inaccurate Prediction</option>
                                 <option value="rain">Rain / Bad Weather</option>
                                 <option value="event">Special Event</option>
                                 <option value="holiday">Holiday</option>
@@ -141,13 +174,51 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Additional Notes</label>
-                            <textarea id="fb-notes" rows="4"></textarea>
+                            <label>Context / Notes</label>
+                            <textarea id="fb-notes" class="dark-input" rows="3" placeholder="Add any details about why demand differed..."></textarea>
                         </div>
-                        <button type="submit" id="btn-feedback" class="primary-btn" style="width: auto;">
-                            <span class="loader" id="loader-feedback"></span> Submit Feedback
+                        <button type="submit" id="btn-feedback" class="primary-btn mt-2">
+                            <span class="loader" id="loader-feedback"></span> Submit Ground Truth
                         </button>
                     </form>
+                </div>
+
+                <!-- 5. Metrics View -->
+                <div id="view-metrics" class="view-section">
+                    <div class="action-bar">
+                        <h2>AI Model Health</h2>
+                        <button id="btn-metrics" class="secondary-btn">
+                            <span class="loader" id="loader-metrics"></span> Refresh Status
+                        </button>
+                    </div>
+                    
+                    <div class="result-area" id="result-metrics">
+                        <div class="insight-banner mb-4">
+                            <span class="insight-icon">🔬</span>
+                            <p>Monitor the predictive engine's accuracy. The feedback loop continuously improves these metrics over time.</p>
+                        </div>
+                        
+                        <div class="stats-grid">
+                            <div class="stat-card glass-card">
+                                <div class="stat-label">Prediction Engine</div>
+                                <div class="stat-value text-neon" id="metric-engine" style="font-size: 2rem; color: var(--primary);">Loading...</div>
+                            </div>
+                            <div class="stat-card glass-card">
+                                <div class="stat-label">Model Error Rate (WMAPE)</div>
+                                <div class="stat-value text-neon" id="metric-mape">--</div>
+                            </div>
+                            <div class="stat-card glass-card">
+                                <div class="stat-label">Active ML Features</div>
+                                <div class="stat-value text-neon" id="metric-features">--</div>
+                            </div>
+                        </div>
+                        
+                        <div class="glass-card mt-4">
+                            <h3 style="margin-bottom: 0.5rem;">Prometheus Telemetry</h3>
+                            <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1.5rem;">Raw system metrics for DevOps monitoring (API latency, database connection pools, memory usage).</p>
+                            <a href="http://localhost:8000/metrics" target="_blank" class="secondary-btn" style="display: inline-block; text-decoration: none;">View Live Metrics Endpoint ↗</a>
+                        </div>
+                    </div>
                 </div>
 
             </main>

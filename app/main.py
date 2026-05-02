@@ -5,7 +5,6 @@ import uuid
 from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, Request, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,7 +14,6 @@ from app.api.routes import router
 from app.core.config import get_settings
 from app.core.logging_config import setup_logging
 from app.core.model_store import load_forecast_model
-from app.jobs.retrain_job import perform_retraining
 
 settings = get_settings()
 
@@ -23,9 +21,6 @@ settings = get_settings()
 setup_logging(level=10 if settings.debug else 20)  # DEBUG=10, INFO=20
 import logging
 logger = logging.getLogger(__name__)
-
-# Scheduler instance
-scheduler = AsyncIOScheduler()
 
 
 @asynccontextmanager
@@ -40,23 +35,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     else:
         logger.warning("ML model not found — API will use rule-based fallback until model is trained")
 
-    # 2. Setup automated model retraining job (daily at 02:00 AM)
-    # Using thread pool executor (default for apscheduler blocking functions)
-    scheduler.add_job(
-        perform_retraining,
-        "cron",
-        hour=2,
-        minute=0,
-        id="daily_retrain_job",
-        replace_existing=True,
-    )
-    scheduler.start()
-    logger.info("Automated model retraining scheduler started.")
+    # Removed automated model retraining scheduler to prevent concurrency issues
+    # Retraining should now be triggered externally via cron or Airflow
 
     yield
 
     logger.info("Shutting down %s", settings.app_name)
-    scheduler.shutdown()
 
 
 app = FastAPI(
