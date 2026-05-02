@@ -1,22 +1,40 @@
-version: "3.9"
+version: '3.8'
 
 services:
-  postgres:
+  db:
     image: postgres:15-alpine
-    container_name: rrps_postgres
+    container_name: rrps_db
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: rrps_db
+      POSTGRES_USER: rrps_user
+      POSTGRES_PASSWORD: rrps_password
+      POSTGRES_DB: rrps
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U rrps_user -d rrps"]
       interval: 5s
-      timeout: 3s
+      timeout: 5s
       retries: 5
+
+  api:
+    build: .
+    container_name: rrps_api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://rrps_user:rrps_password@db:5432/rrps
+      - DATABASE_URL_SYNC=postgresql://rrps_user:rrps_password@db:5432/rrps
+      - APP_ENV=production
+      - DEBUG=False
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # Mount the models directory so models persist across container restarts
+      - ml_artifacts:/app/ml_artifacts
 
 volumes:
   pgdata:
+  ml_artifacts:

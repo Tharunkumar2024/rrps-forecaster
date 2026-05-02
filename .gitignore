@@ -5,12 +5,15 @@
 .env.local
 .env.production
 
+ps.md
 week*.md
 hld.md
 lld*.md
 coding_rules.md
 execution_plan.md
 prd.md
+pytest_out.txt
+test_plan.md
 
 # ========================
 # Virtual Environment
