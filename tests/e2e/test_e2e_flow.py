@@ -33,7 +33,7 @@ def test_e2e_normal_flow(client):
     assert len(staff_data["hourly_plan"]) > 0
     
     # 3. Get Inventory Plan
-    response = client.get(f"/api/v1/inventory-plan?target_date={target_date}")
+    response = client.post("/api/v1/inventory-plan", json={"target_date": target_date})
     assert response.status_code == 200
     inv_data = response.json()
     assert inv_data["plan_date"] == target_date

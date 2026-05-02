@@ -23,13 +23,18 @@ DISHES_PER_COVER = 1.5
 async def generate_inventory_plan(
     db: AsyncSession,
     forecast: ForecastResponse,
+    current_stock: dict[str, float] = None,
 ) -> InventoryPlanResponse:
     """Calculate ingredient quantities needed for a forecasted demand.
     
     1. Converts covers to dishes.
     2. Maps dishes to ingredients using RecipeMap.
     3. Adds safety stock padding.
+    4. Subtracts current stock.
     """
+    if current_stock is None:
+        current_stock = {}
+
     total_covers = sum(h.predicted_covers for h in forecast.hourly_forecast)
     if total_covers == 0:
         return InventoryPlanResponse(plan_date=forecast.forecast_date, ingredients=[])
@@ -62,16 +67,20 @@ async def generate_inventory_plan(
                 }
             ingredient_totals[key]["quantity_kg"] += recipe.quantity * dishes_per_item
 
-    # Apply safety stock and construct response
+    # Apply safety stock, subtract current stock, and construct response
     needs: list[IngredientNeed] = []
     for name, data in ingredient_totals.items():
         base_qty = data["quantity_kg"]
         safe_qty = base_qty * SAFETY_STOCK_FACTOR
         
+        # Subtract current stock
+        stock_on_hand = current_stock.get(name, 0.0)
+        procurement_qty = max(0.0, safe_qty - stock_on_hand)
+        
         needs.append(
             IngredientNeed(
                 ingredient_name=name,
-                quantity_kg=round(safe_qty, 2),
+                quantity_kg=round(procurement_qty, 2),
                 shelf_life_days=data["shelf_life_days"],
                 lead_time_days=data["lead_time_days"],
             )
