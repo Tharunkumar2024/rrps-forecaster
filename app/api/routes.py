@@ -5,8 +5,9 @@ from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.model_store import get_forecast_model, is_model_available
 from app.db.session import get_db
-from app.schemas.forecast import ForecastResponse
+from app.schemas.forecast import ForecastResponse, ModelInfoResponse
 from app.schemas.inventory_plan import InventoryPlanResponse
 from app.schemas.staff_plan import StaffPlanResponse
 from app.services.forecast_service import generate_forecast
@@ -82,3 +83,21 @@ async def get_inventory_plan(
         return await generate_inventory_plan(db, forecast)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Inventory plan generation failed: {exc}")
+
+
+@router.get(
+    "/model-info",
+    response_model=ModelInfoResponse,
+    summary="Get ML model status",
+    description="Returns whether the ML model is loaded and its training metrics.",
+)
+async def get_model_info() -> ModelInfoResponse:
+    if not is_model_available():
+        return ModelInfoResponse(is_model_loaded=False)
+
+    artifact = get_forecast_model()
+    return ModelInfoResponse(
+        is_model_loaded=True,
+        model_mape=artifact.get("mape"),
+        feature_count=len(artifact.get("feature_cols", [])),
+    )

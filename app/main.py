@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router
 from app.core.config import get_settings
+from app.core.model_store import load_forecast_model
 
 settings = get_settings()
 
@@ -22,14 +23,22 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manage startup / shutdown lifecycle."""
-    logger.info("🚀 Starting %s (%s)", settings.app_name, settings.app_env)
+    logger.info("Starting %s (%s)", settings.app_name, settings.app_env)
+
+    # Load ML model into memory at startup
+    is_loaded = load_forecast_model(settings.forecast_model_path)
+    if is_loaded:
+        logger.info("ML forecast model ready for inference")
+    else:
+        logger.warning("ML model not found — API will use rule-based fallback until model is trained")
+
     yield
-    logger.info("🛑 Shutting down %s", settings.app_name)
+    logger.info("Shutting down %s", settings.app_name)
 
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.1.0",
+    version="0.2.0",
     description="AI-powered restaurant demand, staffing, and inventory optimization system.",
     lifespan=lifespan,
 )

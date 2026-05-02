@@ -16,4 +16,16 @@ class ForecastResponse(BaseModel):
     """Full daily forecast response."""
 
     forecast_date: date
+    source: str = Field(
+        default="rule_based",
+        description="Forecast source: 'ml_model' or 'rule_based'",
+    )
     hourly_forecast: list[HourlyForecast]
+
+
+class ModelInfoResponse(BaseModel):
+    """Model status and metadata."""
+
+    is_model_loaded: bool
+    model_mape: float | None = None
+    feature_count: int | None = None
