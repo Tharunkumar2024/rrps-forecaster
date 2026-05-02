@@ -1,103 +1,12 @@
-"""API route definitions — thin controllers, all logic delegated to services."""
+"""API route definitions — aggregates modular sub-routers."""
 
-from datetime import date, timedelta
+from fastapi import APIRouter
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.core.model_store import get_forecast_model, is_model_available
-from app.db.session import get_db
-from app.schemas.forecast import ForecastResponse, ModelInfoResponse
-from app.schemas.inventory_plan import InventoryPlanResponse
-from app.schemas.staff_plan import StaffPlanResponse
-from app.services.forecast_service import generate_forecast
-from app.services.inventory_service import generate_inventory_plan
-from app.services.staff_service import generate_staff_plan
+from app.api import feedback, forecast, inventory, staff
 
 router = APIRouter()
 
-
-@router.get(
-    "/forecast",
-    response_model=ForecastResponse,
-    summary="Get hourly demand forecast",
-    description="Returns predicted customer covers for each hour of the requested date.",
-)
-async def get_forecast(
-    target_date: date = Query(
-        default=None,
-        description="Date to forecast (YYYY-MM-DD). Defaults to tomorrow.",
-    ),
-    db: AsyncSession = Depends(get_db),
-) -> ForecastResponse:
-    if target_date is None:
-        target_date = date.today() + timedelta(days=1)
-
-    try:
-        return await generate_forecast(db, target_date)
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Forecast generation failed: {exc}")
-
-
-@router.get(
-    "/staff-plan",
-    response_model=StaffPlanResponse,
-    summary="Get staff scheduling recommendation",
-    description="Returns recommended staff count per role per hour based on the demand forecast.",
-)
-async def get_staff_plan(
-    target_date: date = Query(
-        default=None,
-        description="Date to plan staff for (YYYY-MM-DD). Defaults to tomorrow.",
-    ),
-    db: AsyncSession = Depends(get_db),
-) -> StaffPlanResponse:
-    if target_date is None:
-        target_date = date.today() + timedelta(days=1)
-
-    try:
-        forecast = await generate_forecast(db, target_date)
-        return await generate_staff_plan(db, forecast)
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Staff plan generation failed: {exc}")
-
-
-@router.get(
-    "/inventory-plan",
-    response_model=InventoryPlanResponse,
-    summary="Get ingredient procurement plan",
-    description="Returns estimated ingredient quantities needed for the forecast date.",
-)
-async def get_inventory_plan(
-    target_date: date = Query(
-        default=None,
-        description="Date to plan inventory for (YYYY-MM-DD). Defaults to tomorrow.",
-    ),
-    db: AsyncSession = Depends(get_db),
-) -> InventoryPlanResponse:
-    if target_date is None:
-        target_date = date.today() + timedelta(days=1)
-
-    try:
-        forecast = await generate_forecast(db, target_date)
-        return await generate_inventory_plan(db, forecast)
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Inventory plan generation failed: {exc}")
-
-
-@router.get(
-    "/model-info",
-    response_model=ModelInfoResponse,
-    summary="Get ML model status",
-    description="Returns whether the ML model is loaded and its training metrics.",
-)
-async def get_model_info() -> ModelInfoResponse:
-    if not is_model_available():
-        return ModelInfoResponse(is_model_loaded=False)
-
-    artifact = get_forecast_model()
-    return ModelInfoResponse(
-        is_model_loaded=True,
-        model_mape=artifact.get("mape"),
-        feature_count=len(artifact.get("feature_cols", [])),
-    )
+router.include_router(forecast.router)
+router.include_router(staff.router)
+router.include_router(inventory.router)
+router.include_router(feedback.router)
