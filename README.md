@@ -75,6 +75,17 @@ python main.py
 
 ---
 
+## 🐳 Docker & Cloud Deployment
+
+For production deployments on **AWS EC2** or **GCP Compute Engine**, the system is fully containerized.
+
+```bash
+# Build and spin up the FastAPI service and PostgreSQL database
+docker-compose up --build -d
+```
+
+---
+
 ## 🧪 Running Tests
 
 The system includes a comprehensive pytest suite (Unit, Integration, and E2E) validating the API, the ML fallbacks, and the deterministic OR-Tools constraints.
