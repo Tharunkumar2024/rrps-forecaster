@@ -5,6 +5,7 @@
 .env.local
 .env.production
 
+ps.md
 week*.md
 hld.md
 lld*.md

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restaurant Optimization Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <h1>Restaurant Optimization Dashboard</h1>
+        </header>
+
+        <div class="main-layout">
+            <!-- Navigation Sidebar -->
+            <aside class="sidebar-nav">
+                <button class="nav-btn active" data-target="view-forecast">📊 Daily Forecast</button>
+                <button class="nav-btn" data-target="view-staff">👥 Staff Plan</button>
+                <button class="nav-btn" data-target="view-inventory">📦 Inventory Plan</button>
+                <button class="nav-btn" data-target="view-feedback">💬 Daily Feedback</button>
+            </aside>
+
+            <!-- Main Content Area -->
+            <main class="content-area">
+                
+                <!-- 1. Forecast View -->
+                <div id="view-forecast" class="view-section active">
+                    <div class="action-bar">
+                        <h2>Daily Forecast</h2>
+                        <div class="controls">
+                            <input type="date" id="forecast-date">
+                            <button id="btn-forecast" class="primary-btn">
+                                <span class="loader" id="loader-forecast"></span> Get Forecast
+                            </button>
+                        </div>
+                    </div>
+                    <div id="error-forecast" class="error-msg"></div>
+                    <div class="result-area" id="result-forecast" style="display: none;">
+                        <div class="insight-banner">
+                            <p><strong>Insight:</strong> Expecting a total of <strong id="total-covers" style="font-size: 1.1rem;">0</strong> customers (covers) throughout the day.</p>
+                        </div>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Hour</th>
+                                        <th>Predicted Covers</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="forecast-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Staff Plan View -->
+                <div id="view-staff" class="view-section">
+                    <div class="action-bar">
+                        <h2>Staff Plan</h2>
+                        <div class="controls">
+                            <input type="date" id="staff-date">
+                            <button id="btn-staff" class="primary-btn">
+                                <span class="loader" id="loader-staff"></span> Get Staff Plan
+                            </button>
+                        </div>
+                    </div>
+                    <div id="error-staff" class="error-msg"></div>
+                    <div class="result-area" id="result-staff" style="display: none;">
+                        <div class="insight-banner">
+                            <p><strong>Insight:</strong> You need a maximum of <strong id="waiters-count">0</strong> Waiters and <strong id="chefs-count">0</strong> Chefs on shift simultaneously during your <strong>peak rush hour</strong>. See the hour-by-hour breakdown below to build your schedule.</p>
+                        </div>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Hour (24h)</th>
+                                        <th>Waiters Needed</th>
+                                        <th>Chefs Needed</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="staff-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Inventory View -->
+                <div id="view-inventory" class="view-section">
+                    <div class="action-bar">
+                        <h2>Inventory Plan</h2>
+                        <div class="controls">
+                            <input type="date" id="inventory-date">
+                            <button id="btn-inventory" class="primary-btn">
+                                <span class="loader" id="loader-inventory"></span> Get Inventory Plan
+                            </button>
+                        </div>
+                    </div>
+                    <div id="error-inventory" class="error-msg"></div>
+                    <div class="result-area" id="result-inventory" style="display: none;">
+                        <div class="insight-banner">
+                            <p><strong>Insight:</strong> These are the total bulk ingredients you need to prepare for the <strong>entire day</strong>. All quantities listed already include an automatic 15% safety stock buffer to handle unexpected demand.</p>
+                        </div>
+                        <div class="table-container">
+                            <ul class="inventory-list" id="inventory-list"></ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Feedback View -->
+                <div id="view-feedback" class="view-section">
+                    <div class="action-bar">
+                        <h2>Daily Feedback</h2>
+                    </div>
+                    <div id="success-feedback" class="success-msg">Feedback submitted successfully!</div>
+                    <div id="error-feedback" class="error-msg"></div>
+                    
+                    <form id="feedback-form" style="max-width: 600px;">
+                        <div class="form-group">
+                            <label for="fb-date">Date</label>
+                            <input type="date" id="fb-date" required>
+                        </div>
+                        <div class="grid-2">
+                            <div class="form-group">
+                                <label>Predicted Covers</label>
+                                <input type="number" id="fb-predicted" required min="0">
+                            </div>
+                            <div class="form-group">
+                                <label>Actual Covers</label>
+                                <input type="number" id="fb-actual" required min="0">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Reason for Discrepancy</label>
+                            <select id="fb-reason" required>
+                                <option value="normal">Normal</option>
+                                <option value="rain">Rain / Bad Weather</option>
+                                <option value="event">Special Event</option>
+                                <option value="holiday">Holiday</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Additional Notes</label>
+                            <textarea id="fb-notes" rows="4"></textarea>
+                        </div>
+                        <button type="submit" id="btn-feedback" class="primary-btn" style="width: auto;">
+                            <span class="loader" id="loader-feedback"></span> Submit Feedback
+                        </button>
+                    </form>
+                </div>
+
+            </main>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>

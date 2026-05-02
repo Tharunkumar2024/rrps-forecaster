@@ -7,6 +7,7 @@ from collections.abc import AsyncGenerator
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, Request, Response
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
@@ -126,6 +127,9 @@ app.include_router(router, prefix="/api/v1")
 async def health_check() -> dict[str, str]:
     """Simple liveness probe."""
     return {"status": "ok"}
+
+# 4. Mount frontend static files to serve the UI
+app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
 
 
 if __name__ == "__main__":
