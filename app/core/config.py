@@ -22,6 +22,13 @@ class Settings(BaseSettings):
     app_name: str = "RRPS Forecaster"
     app_env: str = "development"
     debug: bool = True
+    host: str = "0.0.0.0"
+    port: int = 8000
+
+    @property
+    def reload(self) -> bool:
+        """Enable auto-reload only in development or debug mode."""
+        return self.app_env.lower() == "development" or self.debug
 
     # ML model artifact paths
     model_dir: Path = PROJECT_ROOT / "ml_artifacts"
